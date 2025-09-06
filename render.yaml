@@ -1,0 +1,22 @@
+# render.yaml
+services:
+  - type: web
+    name: pncp-proxy
+    env: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: CACHE_TTL
+        value: 300
+    healthCheckPath: /health
+    autoDeploy: true
+
+# Opcional: Configurações de banco de dados se precisar
+# databases:
+#   - name: pncp-cache
+#     plan: free
