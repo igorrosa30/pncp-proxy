@@ -1,102 +1,57 @@
 const express = require('express');
-const cors = require('cors');
-const fetch = require('node-fetch');
+const axios = require('axios');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Middlewares
-app.use(cors());
+// Middleware básico
 app.use(express.json());
 
-// Health check - ESSENCIAL para o Render
+// Health Check - SIMPLES
 app.get('/health', (req, res) => {
-  res.json({ 
-    status: 'ok', 
-    message: 'PNCP Proxy está funcionando!',
-    timestamp: new Date().toISOString(),
-    version: '1.0.0'
-  });
+  res.json({ status: 'ok', message: 'Proxy funcionando!' });
 });
 
-// Rota principal do proxy
+// Proxy DIRETO para PNCP
 app.get('/api/pncp/*', async (req, res) => {
   try {
-    // Extrai o path da URL original
-    const originalPath = req.path.replace('/api/pncp', '');
+    const path = req.path.replace('/api/pncp', '');
+    const url = `https://pncp.gov.br/api/consulta${path}`;
     
-    // Constrói a URL para o PNCP
-    const url = new URL(`https://pncp.gov.br/api/consulta${originalPath}`);
+    console.log('🔗 Proxy para:', url);
     
-    // Adiciona todos os query parameters
-    Object.keys(req.query).forEach(key => {
-      url.searchParams.append(key, req.query[key]);
+    const response = await axios.get(url, {
+      params: req.query,
+      timeout: 10000
     });
-
-    console.log('🔗 Proxy para:', url.toString());
-
-    // Faz a requisição para o PNCP
-    const response = await fetch(url.toString(), {
-      method: 'GET',
-      headers: {
-        'accept': '*/*',
-        'user-agent': 'PNCP-Proxy/1.0',
-        'cache-control': 'no-cache'
-      },
-      timeout: 30000
-    });
-
-    // Verifica o status da resposta
-    if (!response.ok) {
-      return res.status(200).json({
-        success: false,
-        error: `PNCP retornou erro ${response.status}`,
-        status: response.status,
-        url: url.toString()
-      });
-    }
-
-    // Processa a resposta
-    const data = await response.json();
     
     res.json({
       success: true,
-      data: data,
-      metadata: {
-        timestamp: new Date().toISOString(),
-        source: 'pncp.gov.br'
-      }
+      data: response.data
     });
-
-  } catch (error) {
-    console.error('❌ Erro no proxy:', error);
     
-    res.status(200).json({
+  } catch (error) {
+    console.error('Erro:', error.message);
+    res.json({
       success: false,
-      error: 'Erro no servidor proxy',
-      message: error.message,
-      suggestion: 'Tente novamente em alguns instantes'
+      error: 'Falha na conexão'
     });
   }
 });
 
-// Rota de exemplo para testar
-app.get('/api/exemplo', async (req, res) => {
+// Rota ESPECÍFICA para contratações
+app.get('/api/contratacoes', async (req, res) => {
   try {
-    // Exemplo de consulta simples
-    const response = await fetch('https://pncp.gov.br/api/consulta/v1/contratacoes/publicacao?dataInicial=20240101&dataFinal=20240101&pagina=1', {
-      headers: { 'accept': '*/*' },
-      timeout: 10000
+    const response = await axios.get('https://pncp.gov.br/api/consulta/v1/contratacoes/publicacao', {
+      params: req.query,
+      timeout: 15000
     });
-
-    const data = await response.json();
     
     res.json({
       success: true,
-      message: 'Conexão com PNCP testada com sucesso!',
-      data: data
+      data: response.data
     });
-
+    
   } catch (error) {
     res.json({
       success: false,
@@ -105,34 +60,6 @@ app.get('/api/exemplo', async (req, res) => {
   }
 });
 
-// Rota padrão
-app.get('/', (req, res) => {
-  res.json({
-    message: 'Bem-vindo ao Proxy PNCP!',
-    endpoints: {
-      health: '/health',
-      proxy: '/api/pncp/*',
-      exemplo: '/api/exemplo',
-      documentation: 'https://pncp.gov.br/api/consulta/swagger-ui/index.html'
-    },
-    usage: 'Use /api/pncp/v1/contratacoes/publicacao?dataInicial=20240101&dataFinal=20241231&pagina=1'
-  });
-});
-
-// Inicia o servidor
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 Proxy PNCP rodando na porta ${PORT}`);
-  console.log(`📊 Health check: http://localhost:${PORT}/health`);
-  console.log(`🌐 PNCP Proxy: http://localhost:${PORT}/api/pncp/`);
-});
-
-// Manipulação de erros não capturados
-process.on('unhandledRejection', (err) => {
-  console.error('❌ Erro não tratado:', err);
-  process.exit(1);
-});
-
-process.on('uncaughtException', (err) => {
-  console.error('❌ Exceção não capturada:', err);
-  process.exit(1);
+app.listen(PORT, () => {
+  console.log(`✅ Servidor rodando na porta ${PORT}`);
 });
