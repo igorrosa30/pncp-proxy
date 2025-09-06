@@ -1,0 +1,36 @@
+{
+  "data": [
+    {
+      "numeroControlePNCP": "12345678000100-1-000001/2024",
+      "objetoCompra": "Aquisição de material de escritório para consumo interno",
+      "orgaoEntidadeRazaoSocial": "Ministerio da Economia",
+      "valorTotalEstimado": 150000.00,
+      "dataPublicacaoPncp": "2024-01-15",
+      "modalidadeNome": "Pregão Eletrônico",
+      "situacaoCompraNome": "Divulgada"
+    },
+    {
+      "numeroControlePNCP": "12345678000100-1-000002/2024",
+      "objetoCompra": "Contratação de serviços de manutenção de equipamentos",
+      "orgaoEntidadeRazaoSocial": "Ministerio da Saude",
+      "valorTotalEstimado": 500000.00,
+      "dataPublicacaoPncp": "2024-01-16",
+      "modalidadeNome": "Concorrência",
+      "situacaoCompraNome": "Divulgada"
+    },
+    {
+      "numeroControlePNCP": "12345678000100-1-000003/2024",
+      "objetoCompra": "Obras de reforma de infraestrutura",
+      "orgaoEntidadeRazaoSocial": "Ministerio da Infraestrutura",
+      "valorTotalEstimado": 2500000.00,
+      "dataPublicacaoPncp": "2024-01-17",
+      "modalidadeNome": "Dispensa de Licitação",
+      "situacaoCompraNome": "Divulgada"
+    }
+  ],
+  "totalRegistros": 3,
+  "totalPaginas": 1,
+  "numeroPagina": 1,
+  "paginasRestantes": 0,
+  "empty": false
+}
