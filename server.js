@@ -1,65 +1,121 @@
-const express = require('express');
-const axios = require('axios');
+const http = require('http');
+const https = require('https');
+const url = require('url');
 
-const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Middleware básico
-app.use(express.json());
+// Servidor HTTP simples
+const server = http.createServer(async (req, res) => {
+  // Configura CORS
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-// Health Check - SIMPLES
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok', message: 'Proxy funcionando!' });
-});
-
-// Proxy DIRETO para PNCP
-app.get('/api/pncp/*', async (req, res) => {
-  try {
-    const path = req.path.replace('/api/pncp', '');
-    const url = `https://pncp.gov.br/api/consulta${path}`;
-    
-    console.log('🔗 Proxy para:', url);
-    
-    const response = await axios.get(url, {
-      params: req.query,
-      timeout: 10000
-    });
-    
-    res.json({
-      success: true,
-      data: response.data
-    });
-    
-  } catch (error) {
-    console.error('Erro:', error.message);
-    res.json({
-      success: false,
-      error: 'Falha na conexão'
-    });
+  // Handle OPTIONS preflight
+  if (req.method === 'OPTIONS') {
+    res.writeHead(200);
+    res.end();
+    return;
   }
-});
 
-// Rota ESPECÍFICA para contratações
-app.get('/api/contratacoes', async (req, res) => {
-  try {
-    const response = await axios.get('https://pncp.gov.br/api/consulta/v1/contratacoes/publicacao', {
-      params: req.query,
-      timeout: 15000
-    });
-    
-    res.json({
-      success: true,
-      data: response.data
-    });
-    
-  } catch (error) {
-    res.json({
-      success: false,
-      error: error.message
-    });
+  // Health check
+  if (req.url === '/health' && req.method === 'GET') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ 
+      status: 'ok', 
+      message: 'Servidor funcionando!',
+      timestamp: new Date().toISOString()
+    }));
+    return;
   }
+
+  // Rota de proxy para PNCP
+  if (req.url.startsWith('/api/')) {
+    try {
+      const parsedUrl = url.parse(req.url, true);
+      const path = parsedUrl.pathname.replace('/api', '');
+      
+      // Constrói a URL do PNCP
+      const pncpUrl = `https://pncp.gov.br/api/consulta${path}`;
+      const queryParams = new URLSearchParams(parsedUrl.query).toString();
+      const fullUrl = queryParams ? `${pncpUrl}?${queryParams}` : pncpUrl;
+
+      console.log('🌐 Proxy para:', fullUrl);
+
+      // Faz a requisição para o PNCP usando HTTPS nativo
+      const proxyReq = https.get(fullUrl, (proxyRes) => {
+        let data = '';
+
+        proxyRes.on('data', (chunk) => {
+          data += chunk;
+        });
+
+        proxyRes.on('end', () => {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({
+            success: true,
+            data: JSON.parse(data),
+            metadata: {
+              timestamp: new Date().toISOString(),
+              source: 'pncp.gov.br'
+            }
+          }));
+        });
+      });
+
+      proxyReq.on('error', (error) => {
+        console.error('❌ Erro no proxy:', error);
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          success: false,
+          error: 'Erro de conexão com PNCP',
+          message: error.message
+        }));
+      });
+
+      proxyReq.setTimeout(10000, () => {
+        proxyReq.destroy();
+        res.writeHead(504, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          success: false,
+          error: 'Timeout na conexão com PNCP'
+        }));
+      });
+
+    } catch (error) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        success: false,
+        error: 'Erro interno do servidor',
+        message: error.message
+      }));
+    }
+    return;
+  }
+
+  // Rota padrão
+  res.writeHead(200, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify({
+    message: '🚀 Proxy PNCP HTTP Nativo',
+    endpoints: {
+      health: '/health',
+      proxy: '/api/*',
+      example: '/api/v1/contratacoes/publicacao?dataInicial=20240101&dataFinal=20240131'
+    }
+  }));
 });
 
-app.listen(PORT, () => {
-  console.log(`✅ Servidor rodando na porta ${PORT}`);
+// Inicia o servidor
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`✅ Servidor HTTP rodando na porta ${PORT}`);
+  console.log(`📍 Health check: http://localhost:${PORT}/health`);
+  console.log(`🌐 PNCP Proxy: http://localhost:${PORT}/api/`);
+});
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('🔄 Encerrando servidor...');
+  server.close(() => {
+    process.exit(0);
+  });
 });
